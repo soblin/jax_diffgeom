@@ -69,6 +69,7 @@ def geodesic_trajectory(x0: [float], v0: [float], T=1.0, dt=0.005):
     return xs, vs
 
 def main1():
+    # calc and plot geodesic
     params = [1.0, -2.0]
     """
     print(f'F = \n{F(params)}')
@@ -126,6 +127,7 @@ def main1():
 
 
 def main2():
+    # plot tangent vector along a curve
     # γ: [0, 1] -> (t^2, -sin(t))
     fig = plt.figure()
     ax = plt.axes(projection='3d')
@@ -134,7 +136,9 @@ def main2():
     px, py, pz = [], [], []
     pvx, pvy, pvz = [], [], []
     v_plot_gain = 1.0 / 6.0
+    cnt = 0
     for t_ in np.linspace(0, 1, num=1000):
+        cnt += 1
         # in chart
         t.append(t_)
         x_ = math.pow(t_, 2)
@@ -156,6 +160,8 @@ def main2():
         pvx.append(pv[0])
         pvy.append(pv[1])
         pvz.append(pv[2])
+        if cnt % 100 == 0:
+            ax.quiver(*p, *pv, color='b', linewidth=2)
 
     ax.plot3D(px, py, pz, color='r', linewidth=2)
     r = 1

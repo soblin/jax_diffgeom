@@ -6,6 +6,7 @@ from jax import grad, jit, vmap, random, jacrev, jacfwd
 import matplotlib.pyplot as plt
 from copy import deepcopy
 import numpy as np
+import math
 
 @jit
 def F(params):
@@ -67,7 +68,7 @@ def geodesic_trajectory(x0: [float], v0: [float], T=1.0, dt=0.005):
         vs.append(deepcopy(v))
     return xs, vs
 
-if __name__ == '__main__':
+def main1():
     params = [1.0, -2.0]
     """
     print(f'F = \n{F(params)}')
@@ -88,6 +89,7 @@ if __name__ == '__main__':
     ax = plt.axes(projection='3d')
     # ax.set_aspect("equal")
     xs, ys, zs = [], [], []
+    v_plot_gain = 1.0 / 6.0
     for i in range(len(traj[1])):
         param = traj[1][i]
         p = F(param)
@@ -99,7 +101,7 @@ if __name__ == '__main__':
             # df(param) is the 'differential' of F that maps TM1 to TM2
             v = jnp.dot(jnp.array(dF(param)).transpose(), param_v)
             #print(v)
-            v = v / (jnp.linalg.norm(v) * 6.0)
+            v = v / (jnp.linalg.norm(v)) * v_plot_gain
             ax.quiver(*p, *v, color='b', linewidth=2)
     ax.plot3D(xs, ys, zs, color='r', linewidth=2)
 
@@ -121,3 +123,54 @@ if __name__ == '__main__':
     ax.plot_surface(
         x, y, z, rstride=1, cstride=1, color='gray', alpha=0.4, linewidth=0)
     plt.show()
+
+
+def main2():
+    # γ: [0, 1] -> (t^2, -sin(t))
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    t, x, y = [], [], []
+    vx, vy = [], []
+    px, py, pz = [], [], []
+    pvx, pvy, pvz = [], [], []
+    v_plot_gain = 1.0 / 6.0
+    for t_ in np.linspace(0, 1, num=1000):
+        # in chart
+        t.append(t_)
+        x_ = math.pow(t_, 2)
+        y_ = -math.sin(t_)
+        vx_ = 2 * t_
+        vy_ = -math.cos(t_)
+        x.append(x_)
+        y.append(y_)
+        vx.append(vx_)
+        vy.append(vy_)
+
+        # in embedded manifold
+        p = F([x_, y_])
+        px.append(p[0])
+        py.append(p[1])
+        pz.append(p[2])
+        pv = jnp.dot(jnp.array(dF([x_, y_])).transpose(), jnp.array([vx_, vy_]))
+        pv = pv / jnp.linalg.norm(pv) * v_plot_gain
+        pvx.append(pv[0])
+        pvy.append(pv[1])
+        pvz.append(pv[2])
+
+    ax.plot3D(px, py, pz, color='r', linewidth=2)
+    r = 1
+    pi = np.pi
+    cos = np.cos
+    sin = np.sin
+    phi, theta = np.mgrid[0.0:pi:100j, 0.0:2.0 * pi:100j]
+    x = r * sin(phi) * cos(theta)
+    y = r * sin(phi) * sin(theta)
+    z = r * cos(phi)
+    ax.plot_surface(
+        x, y, z, rstride=1, cstride=1, color='gray', alpha=0.4, linewidth=0)
+    plt.show()
+
+
+if __name__ == '__main__':
+    #main1()
+    main2()

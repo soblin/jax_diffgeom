@@ -188,10 +188,13 @@ def main3():
     vx, vy = [], []
     px, py, pz = [], [], []
     pvx, pvy, pvz = [], [], []
-    v_plot_gain = 1.0 / 5.0
     vx1, vy1 = [], []
-    v_origin = jnp.dot(jnp.array(dF([math.pow(0.0, 2), -math.sin(0.0)])).transpose(), jnp.array([2*0.0, -math.cos(0.0)]))
+    # v_origin = jnp.array([2*0.0, -math.cos(0.0)])
+    v_origin = jnp.array([5.0, 0.0])
     vx1_, vy1_ = v_origin[0], v_origin[1]
+    dv1 = [0.0, 0.0, 0.0]
+    v_plot_gain = 1.0 / 7.5
+    v_plot_gain2 = 1.0 / 9.0 / jnp.linalg.norm(v_origin)
     cnt = 0
     for t_ in np.linspace(0, 1, num=1000):
         # in chart
@@ -206,6 +209,7 @@ def main3():
         vy.append(vy_)
 
         # in embedded manifold
+        ## tangent vector along the curve
         p = F([x_, y_])
         px.append(p[0])
         py.append(p[1])
@@ -217,6 +221,18 @@ def main3():
         pvz.append(pv[2])
         if cnt % 100 == 0:
             ax.quiver(*p, *pv, color='b', linewidth=2)
+
+        ## pararell transport
+        vx1_ += dv1[0] * 0.001 # HACK dt = 0.001
+        vy1_ += dv1[1] * 0.001
+        vx1.append(vx1_)
+        vy1.append(vy1_)
+        Gamma = christoffel2([x_, y_])
+        dv1 = -jnp.einsum("b,abc,c->a", jnp.array([vx1_, vy1_]), Gamma, jnp.array([vx_, vy_]))
+        if cnt % 100 == 0:
+            v2 = jnp.dot(jnp.array(dF([x_, y_])).transpose(), jnp.array([vx1_, vy1_]))
+            v2 = v2 * v_plot_gain2
+            ax.quiver(*p, v2[0], v2[1], v2[2], color='g', linewidth=2)
         cnt += 1
 
     ax.plot3D(px, py, pz, color='r', linewidth=2)
@@ -224,7 +240,7 @@ def main3():
     pi = np.pi
     cos = np.cos
     sin = np.sin
-    phi, theta = np.mgrid[0.0:pi:100j, 0.0:2.0 * pi:100j]
+    phi, theta = np.mgrid[0.0:pi:50j, 0.0:2.0 * pi:50j]
     x = r * sin(phi) * cos(theta)
     y = r * sin(phi) * sin(theta)
     z = r * cos(phi)

@@ -190,7 +190,7 @@ def main3():
     pvx, pvy, pvz = [], [], []
     vx1, vy1 = [], []
     # v_origin = jnp.array([2*0.0, -math.cos(0.0)])
-    v_origin = jnp.array([5.0, 0.0])
+    v_origin = jnp.array([-0.5, -0.5])
     vx1_, vy1_ = v_origin[0], v_origin[1]
     dv1 = [0.0, 0.0, 0.0]
     v_plot_gain = 1.0 / 7.5

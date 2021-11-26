@@ -177,6 +177,63 @@ def main2():
     plt.show()
 
 
+def main3():
+   # pararelll transport of a tangent vector
+    # https://manabitimes.jp/physics/1783
+    # plot tangent vector along a curve
+    # γ: [0, 1] -> (t^2, -sin(t))
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    t, x, y = [], [], []
+    vx, vy = [], []
+    px, py, pz = [], [], []
+    pvx, pvy, pvz = [], [], []
+    v_plot_gain = 1.0 / 5.0
+    vx1, vy1 = [], []
+    v_origin = jnp.dot(jnp.array(dF([math.pow(0.0, 2), -math.sin(0.0)])).transpose(), jnp.array([2*0.0, -math.cos(0.0)]))
+    vx1_, vy1_ = v_origin[0], v_origin[1]
+    cnt = 0
+    for t_ in np.linspace(0, 1, num=1000):
+        # in chart
+        t.append(t_)
+        x_ = math.pow(t_, 2)
+        y_ = -math.sin(t_)
+        vx_ = 2 * t_
+        vy_ = -math.cos(t_)
+        x.append(x_)
+        y.append(y_)
+        vx.append(vx_)
+        vy.append(vy_)
+
+        # in embedded manifold
+        p = F([x_, y_])
+        px.append(p[0])
+        py.append(p[1])
+        pz.append(p[2])
+        pv = jnp.dot(jnp.array(dF([x_, y_])).transpose(), jnp.array([vx_, vy_]))
+        pv = pv / jnp.linalg.norm(pv) * v_plot_gain
+        pvx.append(pv[0])
+        pvy.append(pv[1])
+        pvz.append(pv[2])
+        if cnt % 100 == 0:
+            ax.quiver(*p, *pv, color='b', linewidth=2)
+        cnt += 1
+
+    ax.plot3D(px, py, pz, color='r', linewidth=2)
+    r = 1
+    pi = np.pi
+    cos = np.cos
+    sin = np.sin
+    phi, theta = np.mgrid[0.0:pi:100j, 0.0:2.0 * pi:100j]
+    x = r * sin(phi) * cos(theta)
+    y = r * sin(phi) * sin(theta)
+    z = r * cos(phi)
+    ax.plot_surface(
+        x, y, z, rstride=1, cstride=1, color='gray', alpha=0.4, linewidth=0)
+    plt.show()
+
+
 if __name__ == '__main__':
     #main1()
-    main2()
+    #main2()
+    main3()

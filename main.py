@@ -178,7 +178,7 @@ def main2():
 
 
 def main3():
-   # pararelll transport of a tangent vector
+    # pararelll transport of a tangent vector
     # https://manabitimes.jp/physics/1783
     # plot tangent vector along a curve
     # γ: [0, 1] -> (t^2, -sin(t))

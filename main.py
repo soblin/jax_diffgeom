@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 import numpy as np
 from numpy import pi, cos, sin
+import math
 from typing import Sequence
 from functools import partial
 
@@ -119,53 +120,46 @@ def main1():
 
 
 def main2():
-    # plot tangent vector along a curve
-    # γ: [0, 1] -> (t^2, -sin(t))
+    s2 = S2()
+    # plot tangent vector along a curve γ: [0, 1] -> (t^2, -sin(t))
     fig = plt.figure()
     ax = plt.axes(projection='3d')
-    t, x, y = [], [], []
-    vx, vy = [], []
-    px, py, pz = [], [], []
-    pvx, pvy, pvz = [], [], []
-    v_plot_gain = 1.0 / 6.0
+    ## underbar: in chart
+    xt_, yt_ = [], []
+    vtx_, vty_ = [], []
+    ## in R^3
+    xt, yt, zt = [], [], []
+    vtx, vty, vtz = [], [], []
+    v_plot_gain = 1.0 / 8.0
     cnt = 0
-    for t_ in np.linspace(0, 1, num=1000):
-        cnt += 1
+    for t in np.linspace(0, 1, num=1001):
         # in chart
-        t.append(t_)
-        x_ = math.pow(t_, 2)
-        y_ = -math.sin(t_)
-        vx_ = 2 * t_
-        vy_ = -math.cos(t_)
-        x.append(x_)
-        y.append(y_)
-        vx.append(vx_)
-        vy.append(vy_)
+        xt_ = math.pow(t, 2)
+        yt_ = -math.sin(t)
+        vtx_ = 2 * t
+        vty_ = -math.cos(t)
 
         # in embedded manifold
-        p = F([x_, y_])
-        px.append(p[0])
-        py.append(p[1])
-        pz.append(p[2])
-        pv = jnp.dot(jnp.array(dF([x_, y_])).transpose(), jnp.array([vx_, vy_]))
-        pv = pv / jnp.linalg.norm(pv) * v_plot_gain
-        pvx.append(pv[0])
-        pvy.append(pv[1])
-        pvz.append(pv[2])
+        p = s2.f([xt_, yt_])
+        xt.append(p[0])
+        yt.append(p[1])
+        zt.append(p[2])
+        v = s2.pushfwd([xt_, yt_], [vtx_, vty_])
+        v = v / jnp.linalg.norm(v) * v_plot_gain
+        vtx.append(v[0])
+        vty.append(v[1])
+        vtz.append(v[2])
         if cnt % 100 == 0:
-            ax.quiver(*p, *pv, color='b', linewidth=2)
+            ax.quiver(p[0], p[1], p[2], v[0], v[1], v[2], color='b', linewidth=2)
 
-    ax.plot3D(px, py, pz, color='r', linewidth=2)
-    r = 1
-    pi = np.pi
-    cos = np.cos
-    sin = np.sin
-    phi, theta = np.mgrid[0.0:pi:100j, 0.0:2.0 * pi:100j]
-    x = r * sin(phi) * cos(theta)
-    y = r * sin(phi) * sin(theta)
-    z = r * cos(phi)
-    ax.plot_surface(
-        x, y, z, rstride=1, cstride=1, color='gray', alpha=0.4, linewidth=0)
+        cnt += 1
+
+    ax.plot3D(xt, yt, zt, color='r', linewidth=2)
+    phi, theta = np.mgrid[0.0:pi:20j, 0.0:2.0 * pi:20j]
+    x = 1.0 * sin(phi) * cos(theta)
+    y = 1.0 * sin(phi) * sin(theta)
+    z = 1.0 * cos(phi)
+    ax.plot_surface(x, y, z, rstride=1, cstride=1, color='gray', alpha=0.4, linewidth=0)
     plt.show()
 
 
@@ -242,6 +236,6 @@ def main3():
 
 
 if __name__ == '__main__':
-    main1()
-    #main2()
+    #main1()
+    main2()
     #main3()

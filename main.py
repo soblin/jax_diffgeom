@@ -6,123 +6,115 @@ from jax import grad, jit, vmap, random, jacrev, jacfwd
 import matplotlib.pyplot as plt
 from copy import deepcopy
 import numpy as np
-import math
+from numpy import pi, cos, sin
+from typing import Sequence
+from functools import partial
 
-@jit
-def F(params):
-    x = params[0]
-    y = params[1]
-    denom = 1.0 + x * x + y * y
-    return jnp.array([2.0*x, 2.0*y, (-1.0 + x*x + y*y)]) / denom
+class EmbeddedManifold(object):
+    def __init__(self):
+        pass
 
-@jit
-def dF(params):
-    return jnp.array(jacrev(F)(params))
+    def f(self, xs: Sequence[float]):
+        raise NotImplementedError("class EmbeddedManifold is abstract")
 
-@jit
-def g(params):
-    df = dF(params)
-    return jnp.dot(df, df.transpose())
+    @partial(jit, static_argnums=(0,))
+    def df(self, xs: Sequence[float]):
+        return jnp.array(jacrev(self.f)(xs))
 
-@jit
-def dg(params):
-    return jnp.array(jacrev(g)(params)).transpose(1, 2, 0)
+    @partial(jit, static_argnums=(0,))
+    def pushfwd(self, xs: Sequence[float], vs: Sequence[float]):
+        df = self.df(xs)
+        return jnp.dot(df.transpose(), jnp.array(vs))
 
-def christoffel1(params):
-    """
-    first christoffel symbol
-    https://manabitimes.jp/physics/1782
-    """
-    G = dg(params)
-    return jnp.array(0.5 * (G.transpose(0, 2, 1) + G.transpose(1, 2, 0) - G))
+    @partial(jit, static_argnums=(0,))
+    def g(self, xs: Sequence[float]):
+        df = self.df(xs)
+        return jnp.dot(df, df.transpose())
 
-def christoffel2(params):
-    G = g(params)
-    Ginv = jnp.linalg.inv(G)
-    Gamma = christoffel1(params)
-    return jnp.einsum("ab,bcd->acd", Ginv, Gamma)
+    @partial(jit, static_argnums=(0,))
+    def dg(self, xs: Sequence[float]):
+        # dg[i][j][k] = ∂g_ij / ∂x_k
+        return jnp.array(jacrev(self.g)(xs)).transpose(1, 2, 0)
 
-def dF_manual(params):
-    x = params[0]
-    y = params[1]
-    denom = 1.0 + x * x + y * y
-    return jnp.array([[2-2*x*x+2*y*y, -4*x*y, 4*x],
-                    [-4*x*y, 2+2*x*x-2*y*y, 4*y]]) / (denom*denom)
+    @partial(jit, static_argnums=(0,))
+    def Gamma(self, xs: Sequence[float]):
+        # 2nd Christoffel symbol
+        # ref: https://manabitimes.jp/physics/1782
+        ginv = jnp.linalg.inv(self.g(xs))
+        Gamma_aux = self.Gamma_aux(xs)
+        return jnp.einsum("ab,bcd->acd", ginv, Gamma_aux)
 
-def g_manual(params):
-    df = dF_manual(params)
-    return jnp.dot(df, df.transpose())
+    @partial(jit, static_argnums=(0,))
+    def Gamma_aux(self, xs: Sequence[float]):
+        dg = self.dg(xs)
+        return jnp.array(0.5 * (dg.transpose(0, 2, 1) + dg.transpose(1, 2, 0) - dg))
 
-def geodesic_trajectory(x0: [float], v0: [float], T=1.0, dt=0.005):
-    x, v = deepcopy(x0), deepcopy(v0)
-    xs, vs = [deepcopy(x)], [deepcopy(v)]
-    t = 0.0
-    while t < T:
-        t += dt
-        Gamma = christoffel2(x)
-        a = -jnp.einsum("abc,b,c->a", Gamma, v, v)# dv/dt or d^2x/dt^2
-        for i in range(len(v)):
-            v[i] += a[i] * dt
-            x[i] += v[i] * dt
-        xs.append(deepcopy(x))
-        vs.append(deepcopy(v))
-    return xs, vs
+    def geodesics(self, x0: Sequence[float], v0: Sequence[float], T=1.0, dt=0.005, embed=False):
+        # return the list of position and velocity in chart or embedded R^n
+        x, v = deepcopy(x0), deepcopy(v0)
+        xs, vs = [], []
+        t = 0.0
+        while t <= T:
+            if embed:
+                x_ = self.f(x)
+                v_ = self.pushfwd(x, v)
+                xs.append(x_)
+                vs.append(v_)
+            else:
+                xs.append(deepcopy(x))
+                vs.append(deepcopy(v))
+
+            Gamma = self.Gamma(x)
+            acc = -jnp.einsum("abc,b,c->a", Gamma, v, v)
+            for i in range(len(acc)):
+                v[i] += acc[i] * dt
+                x[i] += v[i] * dt
+
+            t += dt
+
+        return xs, vs
+
+class S2(EmbeddedManifold):
+    def __init__(self):
+        pass
+
+    def f(self, xs: Sequence[float]):
+        x, y = xs[0], xs[1]
+        denom = 1.0 + x * x + y * y
+        return jnp.array([2.0*x, 2.0*y, (-1.0 + x*x + y*y)]) / denom
 
 def main1():
-    # calc and plot geodesic
-    params = [1.0, -2.0]
-    """
-    print(f'F = \n{F(params)}')
-    print(f'diff of dF = \n{dF(params) - dF_manual(params)}')
-    print(f'diff of g = \n{g(params) - g_manual(params)}')
-    print(f'Γ1 = \n{christoffel1(params)}')
-    print(f'Γ2 = \n{christoffel2(params)}')
-    """
+    s2 = S2()
     # case 1
     x0 = [1.0, 2.0]
     v0 = [-1.0, -5.0]
     # case 2
     x0 = [0.02, 0.02]
     v0 = [-1.0, 0.0]
-    traj = geodesic_trajectory(x0, v0, 5.0)
+    xs, vs = s2.geodesics(x0, v0, T=1.5, embed=True)
 
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     # ax.set_aspect("equal")
-    xs, ys, zs = [], [], []
+    x, y, z = [], [], []
     v_plot_gain = 1.0 / 6.0
-    for i in range(len(traj[1])):
-        param = traj[1][i]
-        p = F(param)
-        xs.append(p[0])
-        ys.append(p[1])
-        zs.append(p[2])
-        if i % 100 == 0:
-            param_v = jnp.array(traj[1][i])
-            # df(param) is the 'differential' of F that maps TM1 to TM2
-            v = jnp.dot(jnp.array(dF(param)).transpose(), param_v)
-            #print(v)
+    for i in range(len(xs)):
+        p = xs[i]
+        x.append(p[0])
+        y.append(p[1])
+        z.append(p[2])
+        if i % 50 == 0:
+            v = jnp.array(vs[i])
             v = v / (jnp.linalg.norm(v)) * v_plot_gain
-            ax.quiver(*p, *v, color='b', linewidth=2)
-    ax.plot3D(xs, ys, zs, color='r', linewidth=2)
+            ax.quiver(p[0], p[1], p[2], v[0], v[1], v[2], color='b', linewidth=2)
 
-    """
-    u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
-    x = np.cos(u)*np.sin(v)
-    y = np.sin(u)*np.sin(v)
-    z = np.cos(v)
-    ax.plot_wireframe(x, y, z, color="r")
-    """
-    r = 1
-    pi = np.pi
-    cos = np.cos
-    sin = np.sin
-    phi, theta = np.mgrid[0.0:pi:100j, 0.0:2.0 * pi:100j]
-    x = r * sin(phi) * cos(theta)
-    y = r * sin(phi) * sin(theta)
-    z = r * cos(phi)
-    ax.plot_surface(
-        x, y, z, rstride=1, cstride=1, color='gray', alpha=0.4, linewidth=0)
+    ax.plot3D(x, y, z, color='r', linewidth=2)
+
+    phi, theta = np.mgrid[0.0:pi:20j, 0.0:2.0*pi:20j]
+    x = 1.0 * sin(phi) * cos(theta)
+    y = 1.0 * sin(phi) * sin(theta)
+    z = 1.0 * cos(phi)
+    ax.plot_surface(x, y, z, rstride=1, cstride=1, color='gray', alpha=0.4, linewidth=0)
     plt.show()
 
 
@@ -250,6 +242,6 @@ def main3():
 
 
 if __name__ == '__main__':
-    #main1()
+    main1()
     #main2()
-    main3()
+    #main3()

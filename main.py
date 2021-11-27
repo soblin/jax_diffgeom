@@ -18,6 +18,8 @@ class EmbeddedManifold(object):
     def f(self, xs: Sequence[float]):
         raise NotImplementedError("class EmbeddedManifold is abstract")
 
+    # workaround for @jit of member function
+    # ref: https://github.com/google/jax/issues/1251
     @partial(jit, static_argnums=(0,))
     def df(self, xs: Sequence[float]):
         return jnp.array(jacrev(self.f)(xs))
@@ -34,7 +36,7 @@ class EmbeddedManifold(object):
 
     @partial(jit, static_argnums=(0,))
     def dg(self, xs: Sequence[float]):
-        # dg[i][j][k] = ∂g_ij / ∂x_k
+        # dg[i][j][k] := ∂g_ij / ∂x_k
         return jnp.array(jacrev(self.g)(xs)).transpose(1, 2, 0)
 
     @partial(jit, static_argnums=(0,))
@@ -51,6 +53,10 @@ class EmbeddedManifold(object):
         return jnp.array(0.5 * (dg.transpose(0, 2, 1) + dg.transpose(1, 2, 0) - dg))
 
     def geodesics(self, x0: Sequence[float], v0: Sequence[float], T=1.0, dt=0.005, embed=False):
+        return self._geodesics(x0, v0, T, dt, embed)
+
+    @partial(jit, static_argnums=(0,))
+    def _geodesics(self, x0: Sequence[float], v0: Sequence[float], T: float, dt: float, embed: bool):
         # return the list of position and velocity in chart or embedded R^n
         x, v = deepcopy(x0), deepcopy(v0)
         xs, vs = [], []
@@ -92,7 +98,7 @@ def main1():
     # case 2
     x0 = [0.02, 0.02]
     v0 = [-1.0, 0.0]
-    xs, vs = s2.geodesics(x0, v0, T=1.5, embed=True)
+    xs, vs = s2.geodesics(x0, v0, T=1.5, dt=0.005, embed=True)
 
     fig = plt.figure()
     ax = plt.axes(projection='3d')
@@ -141,14 +147,12 @@ def main2():
 
         # in embedded manifold
         p = s2.f([xt_, yt_])
-        xt.append(p[0])
-        yt.append(p[1])
-        zt.append(p[2])
+        for l_, v_ in zip([xt, yt, zt], [p[0], p[1], p[2]]):
+            l_.append(v_)
         v = s2.pushfwd([xt_, yt_], [vtx_, vty_])
         v = v / jnp.linalg.norm(v) * v_plot_gain
-        vtx.append(v[0])
-        vty.append(v[1])
-        vtz.append(v[2])
+        for l_, v_ in zip([vtx, vty, vtz], [v[0], v[1], v[2]]):
+            l_.append(v_)
         if cnt % 100 == 0:
             ax.quiver(p[0], p[1], p[2], v[0], v[1], v[2], color='b', linewidth=2)
 

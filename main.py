@@ -16,14 +16,13 @@ class EmbeddedManifold(object):
         pass
 
     def f(self, xs: Sequence[float]):
-        raise NotImplementedError("class EmbeddedManifold is abstract")
+        raise NotImplementedError("abstract class EmbeddedManifold does not have f impl")
+
+    def df(self, xs: Sequence[float]):
+        raise NotImplementedError("abstract class EmbeddedManifold does not have df impl")
 
     # workaround for @jit of member function
     # ref: https://github.com/google/jax/issues/1251
-    @partial(jit, static_argnums=(0,))
-    def df(self, xs: Sequence[float]):
-        return jnp.array(jacrev(self.f)(xs))
-
     @partial(jit, static_argnums=(0,))
     def pushfwd(self, xs: Sequence[float], vs: Sequence[float]):
         df = self.df(xs)
@@ -82,6 +81,12 @@ class S2(EmbeddedManifold):
         x, y = xs[0], xs[1]
         denom = 1.0 + x*x + y*y
         return jnp.array([2.0*x, 2.0*y, (1.0 - x*x - y*y)]) / denom
+
+    def df(self, xs: Sequence[float]):
+        x, y = xs[0], xs[1]
+        denom = 1.0 + x*x + y*y
+        return jnp.array([[2-2*x*x+2*y*y, -4*x*y, -4*x],
+                          [-4*x*y, 2+2*x*x-2*y*y, -4*y]]) / (denom*denom)
 
 def main1():
     s2 = S2()
@@ -185,6 +190,9 @@ def main3():
         yt_ = -math.sin(t)
         vtx_ = 2*t
         vty_ = -math.cos(t)
+        #Ltv = math.sqrt(vtx_**2 + vty_**2)
+        #vtx_ /= Ltv
+        #vty_ /= Ltv
         """
         xt_ = math.cos(t)
         yt_ = math.sin(t)
@@ -251,7 +259,7 @@ def check_jac_dimension():
     print(ret.shape) # -> (2,2,3)
 
 if __name__ == '__main__':
-    #main1()
-    #main2()
+    main1()
+    main2()
     main3()
     #check_jac_dimension()

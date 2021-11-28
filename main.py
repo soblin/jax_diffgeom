@@ -52,24 +52,17 @@ class EmbeddedManifold(object):
         dg = self.dg(xs)
         return jnp.array(0.5 * (dg.transpose(0, 2, 1) + dg.transpose(1, 2, 0) - dg))
 
-    def geodesics(self, x0: Sequence[float], v0: Sequence[float], T=1.0, dt=0.005, embed=False):
-        return self._geodesics(x0, v0, T, dt, embed)
-
-    @partial(jit, static_argnums=(0,))
-    def _geodesics(self, x0: Sequence[float], v0: Sequence[float], T: float, dt: float, embed: bool):
+    #@partial(jit, static_argnums=(0,))
+    def geodesics(self, x0: Sequence[float], v0: Sequence[float], T: float, dt: float):
         # return the list of position and velocity in chart or embedded R^n
         x, v = deepcopy(x0), deepcopy(v0)
         xs, vs = [], []
         t = 0.0
         while t <= T:
-            if embed:
-                x_ = self.f(x)
-                v_ = self.pushfwd(x, v)
-                xs.append(x_)
-                vs.append(v_)
-            else:
-                xs.append(deepcopy(x))
-                vs.append(deepcopy(v))
+            x_ = self.f(x)
+            v_ = self.pushfwd(x, v)
+            xs.append(x_)
+            vs.append(v_)
 
             Gamma = self.Gamma(x)
             acc = -jnp.einsum("abc,b,c->a", Gamma, v, v)
@@ -87,8 +80,8 @@ class S2(EmbeddedManifold):
 
     def f(self, xs: Sequence[float]):
         x, y = xs[0], xs[1]
-        denom = 1.0 + x * x + y * y
-        return jnp.array([2.0*x, 2.0*y, (-1.0 + x*x + y*y)]) / denom
+        denom = 1.0 + x*x + y*y
+        return jnp.array([2.0*x, 2.0*y, (1.0 - x*x - y*y)]) / denom
 
 def main1():
     s2 = S2()
@@ -96,9 +89,9 @@ def main1():
     x0 = [1.0, 2.0]
     v0 = [-1.0, -5.0]
     # case 2
-    x0 = [0.02, 0.02]
-    v0 = [-1.0, 0.0]
-    xs, vs = s2.geodesics(x0, v0, T=1.5, dt=0.005, embed=True)
+    x0 = [0.0, 0.0]
+    v0 = [1.0, -1.0]
+    xs, vs = s2.geodesics(x0, v0, 1.5, 0.005)
 
     fig = plt.figure()
     ax = plt.axes(projection='3d')
@@ -190,9 +183,9 @@ def main3():
         # in chart
         xt_ = math.pow(t, 2)
         yt_ = -math.sin(t)
-        vtx_ = 2 * t
+        vtx_ = 2*t
         vty_ = -math.cos(t)
-
+        # Lvt = float(jnp.linalg.norm([vtx_, vty_]))
         # in embedded manifold
         p = s2.f([xt_, yt_])
         for l_, v_ in zip([xt, yt, zt], [p[0], p[1], p[2]]):
@@ -211,8 +204,11 @@ def main3():
         if cnt % 100 == 0:
             ax.quiver(p[0], p[1], p[2], v[0], v[1], v[2], color='b', linewidth=2)
             ax.quiver(p[0], p[1], p[2], vec[0]*vec_gain, vec[1]*vec_gain, vec[2]*vec_gain, color='g', linewidth=3)
+            print(math.sqrt(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]), ' ',
+                  math.sqrt(vec_[0]*vec_[0] + vec_[1]*vec_[1]),
+                  dvec_)
 
-        dvec_ = -jnp.einsum("abc,b,c->a", Gamma, jnp.array([vtx_, vty_]), jnp.array(vec_))
+        dvec_ = -jnp.einsum("abc,b,c->a", Gamma, [vtx_, vty_], vec_)
         for i in range(len(vec_)):
             vec_[i] += dvec_[i] * 0.001
 
@@ -226,8 +222,30 @@ def main3():
     ax.plot_surface(x, y, z, rstride=1, cstride=1, color='gray', alpha=0.4, linewidth=0)
     plt.show()
 
+def check_jac_dimension():
+    def f(x):
+        return jnp.array([x[0], x[1]])
+
+    def df(x):
+        return jnp.array(jacrev(f)(x))
+
+    def g(x):
+        return jnp.array([[jnp.linalg.norm(x), 0], [0, jnp.linalg.norm(x)]])
+
+    def dg(x):
+        return jnp.array(jacrev(g)(x))
+
+    x = [1.0, 2.0, 3.0]
+    ret = df(x)
+    print(ret.shape) # -> (3,2)
+    #ret = ret.transpose(1, 2, 0)
+    ret = dg(x)
+    print(ret.shape) # -> (3,2,2)
+    ret = ret.transpose(1, 2, 0)
+    print(ret.shape) # -> (2,2,3)
 
 if __name__ == '__main__':
     #main1()
     #main2()
     main3()
+    #check_jac_dimension()

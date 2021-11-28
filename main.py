@@ -185,6 +185,12 @@ def main3():
         yt_ = -math.sin(t)
         vtx_ = 2*t
         vty_ = -math.cos(t)
+        """
+        xt_ = math.cos(t)
+        yt_ = math.sin(t)
+        vtx_ = -math.sin(t)
+        vty_ = math.cos(t)
+        """
         # Lvt = float(jnp.linalg.norm([vtx_, vty_]))
         # in embedded manifold
         p = s2.f([xt_, yt_])

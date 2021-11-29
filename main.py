@@ -258,8 +258,24 @@ def check_jac_dimension():
     ret = ret.transpose(1, 2, 0)
     print(ret.shape) # -> (2,2,3)
 
+def cross(a, b):
+    return jnp.array([
+        a[1]*b[2] - a[2]*b[1],
+        a[2]*b[0] - a[0]*b[2],
+        a[0]*b[1] - a[1]*b[0]])
+
+def get_B(v):
+    """ R^3 basis with first basis vector v """
+    b1 = v
+    k = jnp.argmin(jnp.abs(v))
+    ek = jnp.eye(3)[:,k]
+    b2 = ek-v[k]*v
+    b3 = cross(b1,b2)
+    return jnp.stack((b1,b2,b3),axis=1)
+
 if __name__ == '__main__':
-    main1()
-    main2()
-    main3()
+    #main1()
+    #main2()
+    #main3()
     #check_jac_dimension()
+    print(get_B(jnp.array([1.0, 2.0, 3.0])))

@@ -189,8 +189,8 @@ def main3():
         gamma_vxt = 2*t
         gamma_vyt = -math.cos(t)
         gamma_Lvt = math.hypot(gamma_vxt, gamma_vyt)
-        gamma_vxt /= gamma_Lvt
-        gamma_vyt /= gamma_Lvt
+        # gamma_vxt /= gamma_Lvt
+        # gamma_vyt /= gamma_Lvt
         # in embedded manifold
         [xt, yt, zt] = s2.f([gamma_xt, gamma_yt])
         for l_, v_ in zip([xts, yts, zts], [xt, yt, zt]):
@@ -215,11 +215,10 @@ def main3():
             vyt_plt = vyt / Lvt * v_plot_gain
             vzt_plt = vzt / Lvt * v_plot_gain
             ax.quiver(xt, yt, zt, vxt_plt, vyt_plt, vzt_plt, color='g', linewidth=3)
-            print(math.sqrt(Jvxt*Jvxt + Jvyt*Jvyt + Jvzt*Jvzt), ' ', dv)
             g = s2.g([gamma_xt, gamma_yt])
             v_ = jnp.array(v)
-            norm = v_.transpose().dot(g).dot(v_)
-            print(norm)
+            norm = math.sqrt(v_.transpose().dot(g).dot(v_))
+            print(f"norm: in chart: {norm}: in R^3: ", math.sqrt(Jvxt * Jvxt + Jvyt * Jvyt + Jvzt * Jvzt))
         dv = -jnp.einsum("abc,b,c->a", Gamma, [gamma_vxt, gamma_vyt], v)
         for i in range(len(dv)):
             v[i] += dv[i] * (1.0 / num)

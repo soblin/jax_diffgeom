@@ -50,6 +50,11 @@ class EmbeddedManifold(object):
                       + jnp.einsum("im,mlk->ikl", ginv, Dg)
                       - jnp.einsum("im,klm->ikl", ginv, Dg))
 
+    def accel(self, xs: Sequence[float],  vs: Sequence[float]):
+        Gamma = self.Gamma(xs)
+        v = jnp.array(vs)
+        return -jnp.einsum("abc,b,c->a", Gamma, v, v)
+
     #@partial(jit, static_argnums=(0,))
     def geodesics(self, x0: Sequence[float], v0: Sequence[float], T: float, dt: float):
         # return the list of position and velocity in chart or embedded R^n
@@ -62,8 +67,7 @@ class EmbeddedManifold(object):
             xs.append(x_)
             vs.append(v_)
 
-            Gamma = self.Gamma(x)
-            acc = -jnp.einsum("abc,b,c->a", Gamma, v, v)
+            acc = self.accel(x, v)
             for i in range(len(acc)):
                 v[i] += acc[i] * dt
                 x[i] += v[i] * dt
@@ -179,6 +183,7 @@ def main3():
     # vector to be transported
     v = [-0.5, -0.5]  # in chart
     dv = [0.0, 0.0]  # in chart
+    norms = []
     Jvs = []
     cnt = 0
     num = 1001;
@@ -218,6 +223,7 @@ def main3():
             g = s2.g([gamma_xt, gamma_yt])
             v_ = jnp.array(v)
             norm = math.sqrt(v_.transpose().dot(g).dot(v_))
+            norms.append(norm)
             print(f"norm: in chart: {norm}: in R^3: ", math.sqrt(Jvxt * Jvxt + Jvyt * Jvyt + Jvzt * Jvzt))
         dv = -jnp.einsum("abc,b,c->a", Gamma, [gamma_vxt, gamma_vyt], v)
         for i in range(len(dv)):
@@ -232,6 +238,8 @@ def main3():
     z = 1.0 * cos(phi)
     ax.plot_surface(x, y, z, rstride=1, cstride=1,
                     color='gray', alpha=0.4, linewidth=0)
+    plt.show()
+    plt.plot(norms)
     plt.show()
 
 
